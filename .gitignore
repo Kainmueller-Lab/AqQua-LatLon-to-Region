@@ -1,0 +1,4 @@
+.prettierrc
+.python-version
+_version.py
+pyrightconfig.json
