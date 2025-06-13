@@ -317,21 +317,21 @@ def _exportFigure(
     for p in provinces.values():
         polygons = p["provGeoms"]
         clr = (random.random(), random.random(), random.random())
-        for polygon in polygons:
+        for idx, polygon in enumerate(polygons):
             center = shapely.centroid(polygon)
             shapely.plotting.plot_polygon(
                 polygon, color=clr, linewidth=1.0, add_points=False
             )
-            plt.text(center.x, center.y, p["provCode"], fontsize=22)
+            plt.text(center.x, center.y, p["provCode"] + str(idx), fontsize=12)
 
     for lat, lon in zip(latitude, longitude):
         plt.plot(
             lat,
             lon,
             marker="o",
-            markersize=20,
+            markersize=10,
             markeredgecolor="red",
-            markerfacecolor="green",
+            markerfacecolor=(0.0, 1.0, 0.0, 0.5),
         )
     plt.savefig(filename, dpi=300)
 
