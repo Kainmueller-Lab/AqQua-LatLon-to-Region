@@ -1,156 +1,269 @@
-#!/usr/bin/python
+"""This package provides the function `find_region` that takes as input latitude and longitude coordinates and a definition of Longhurst Provinces returns the Longhurst Province where the coordinate is located. It provides a second function `parseLonghurstXML` to separately parse a Longhurst Provinces definition file."""
 
-'''
-COORDS2LONGHURST
+import argparse
+import logging
+import random
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Any
 
-This script takes as input latitude and longitude coordinates and returns the 
-Longhurst Province where the coordinate is found.  It works by parsing a file that 
-contains lat/long coordinates that bound each province and performing the Crossings Test
-on each province.  The Crossings Test is used in computer graphics to quickly 
-determine if a point is within or outside a polygon by "drawing" a line east from the
-input coordinate and seeing how many crossings the line makes with the polygon border. 
-If there is an odd number of crossings, the point is within the polygon, otherwise the
-point is outside the polygon.
+import matplotlib.pyplot as plt
+import shapely
+import shapely.plotting
 
-
-dependent on:
-	longhurst.xml:	A .gml file that contains the coordinates that bound each province
-	
-in:
-	myLat:	Northerly latitude ranging from -90 to 90
-	myLon:  Easterly longitude ranging from -180 to 180
-	
-out:
-	Longhurst province code and name where the coordinate can be found. 
-	If the coordinate is on land, or otherwise unassociated with a province, 
-		a list of candidate provinces to check manually will be returned.
-		
-@ Sara Collins.  MIT.  3/18/2015
-
-'''
-
-import sys
-from xml.dom.minidom import *
+logger = logging.getLogger(__name__)
 
 
-### Get lat and lon from command line argument list
-###--------------------------------------------------------------------------
+def find_region(
+    latitude: float,
+    longitude: float,
+    longhurst_definition: str | Path | dict[str, dict[str, Any]],
+    plot_file=None,
+) -> dict[str, Any] | None:
+    """Function to match query lat/lon coordinates to their Longhurst Province.
 
-ppFileName = string(sys.argv[1])
-imgFileName = string(sys.argv[2])	
-	
-	
-### Parse GML data from longhurst.xml
-###--------------------------------------------------------------------------
+    Parameters
+    ----------
+    latitude : float
+        Northerly latitude ranging from -90 to 90
+    longitude : float
+        Easterly longitude ranging from -180 to 180
+    longhurst_definition: str or dict
+        Definition of the provinces, either path to the xml file or already parsed definition within a dictionary
+    plot_file: str or None
+        If provided, a map of the provinces and the query coordinates will be plotted and written to this file.
 
-provinces = {}
-tree = parse('longhurst.xml')
+    Returns
+    -------
+    region : dict or None
+        `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
 
-for node in tree.getElementsByTagName('MarineRegions:longhurst'):
+    Raises
+    ------
+    RuntimeError
+        If multiple regions are found (bug in definition?)
+    """
+    if isinstance(longhurst_definition, (str, Path)):
+        provinces = parseLonghurstXML(Path(longhurst_definition))
+    else:
+        provinces = longhurst_definition
+    provincesBB = _findMatchingBoundingBoxes(latitude, longitude, provinces)
+    provincesFine = _findMatchingProvinceFine(latitude, longitude, provincesBB)
 
-	# 1. Get province code, name and bounding box from file
-	provCode = node.getElementsByTagName('MarineRegions:provcode')[0].firstChild.data
-	provName = node.getElementsByTagName('MarineRegions:provdescr')[0].firstChild.data
-	fid = node.getAttribute("fid")
-	b = node.getElementsByTagName('gml:coordinates')[0].firstChild.data
+    if plot_file is not None:
+        _exportFigure(plot_file, latitude, longitude, provinces)
 
-	# 2. Parse bounding box coordinates
-	b = b.split(' ')
-	x1,y1 = b[0].split(',')
-	x2,y2 = b[1].split(',')
-	x1 = float(x1)
-	y1 = float(y1)
-	x2 = float(x2)
-	y2 = float(y2)
+    region = None
+    if len(provincesFine) == 0:
+        logger.debug(f"No province found matching {latitude} N, {longitude}E.  ")
+        logger.debug(
+            "This coordinate is either on land or it could be in one of these... "
+        )
+        for fid, p in provincesBB.items():
+            print(fid, p["provCode"], p["provName"])
 
-	provinces[fid] = {'provName': provName, 'provCode': provCode, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2}
+    elif len(provincesFine) == 1:
+        region = list(provincesFine.values())[0]
+        logger.info(f"Found region: {latitude} N, {longitude} E -->  {region}")
 
+    elif len(provincesFine) > 1:
+        raise RuntimeError(f"found multiple regions? ({provincesFine})")
 
-### Find which candidate provinces our coordinates come from.
-###--------------------------------------------------------------------------
-
-inProvince = {}
-for p in provinces:
-	inLat = 0
-	inLon = 0
-	
-	if (myLat>=provinces[p]['y1'] and myLat<=provinces[p]['y2']):
-		inLat = 1
-		
-	if (myLon>=provinces[p]['x1'] and myLon<=provinces[p]['x2']):
-		inLon = 1
-	
-	if inLat and inLon:
-		inProvince[p] = True	
-		
-		
-### Perform Crossings Test on each candidate province.
-###--------------------------------------------------------------------------
-
-for node in tree.getElementsByTagName('MarineRegions:longhurst'):
-	fid = node.getAttribute("fid")
-	
-	if inProvince.get(fid):
-		crossings = 0
-		
-		## 1. Get all coordinate pairs for this province.
-		geom = node.getElementsByTagName('MarineRegions:the_geom')
-		
-		for g in geom:
-			c = g.getElementsByTagName('gml:coordinates')
-			
-			for i in c:
-				ii = i.childNodes
-				coordStr = ii[0].data		#<--- contains coordinate strings
-				P = coordStr.split(' ')
-				
-				pairs = []
-				for p in P:
-					[lon,lat] = p.split(',')
-					pairs.append([float(lon),float(lat)])	
-					
-				## 2. Use pair p and p+1 to perform Crossings Test.
-				for i in range(len(pairs)-1):
-					# test latitude
-					passLat = (pairs[i][1]>=myLat and pairs[i+1][1]<=myLat) or (pairs[i][1]<=myLat and pairs[i+1][1]>=myLat)
-
-					# test longitude
-					passLon = (myLon <= pairs[i+1][0])
-				
-					if passLon and passLat:
-						crossings += 1
-		 					
-		if crossings%2==1: 
-			inProvince[fid] = True
-		else:
-			inProvince[fid] = False
+    return region
 
 
-### Print solution to terminal.
-###--------------------------------------------------------------------------
+def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
+    """
+    Parse GML data from longhurst.xml
 
-solution = []
-for i in inProvince:
-	if inProvince[i] == True:
-		solution.append([provinces[i]['provCode'], provinces[i]['provName']])
+    Parameters
+    ----------
+    fl : str or Path
+        Path to the definition of the Longhurst Provinces (in xml/gml)
 
-if len(solution)==0:
-	print
-	print 'No province found matching ', myLat, 'N, ', myLon, 'E.  '
-	print 'This coordinate is either on land or it could be in one of these... '
-	for i in inProvince:
-		print provinces[i]['provCode'], '\t', provinces[i]['provName']
-	print
-	
-elif len(solution) == 1:
-	print
-	print myLat, 'N, ', myLon, 'E -->  ', solution[0][0], '\t', solution[0][1]
-	print
-	
-elif len(solution) > 1:
-	print
-	print 'Conflict between these provinces... '
-	for i in solution:
-		print solution[0][0], '\t', solution[0][1]
-	print
-		
+    Returns
+    -------
+    provinces : dict
+        `dict` with the parsed provinces, mapping fid to province information (name, code, bounding box, polygon)
+
+    Raises
+    ------
+    AssertionError
+        If input file is formatted incorrectly.
+    """
+    provinces = {}
+    tree = ET.parse("longhurst.xml")
+
+    root = tree.getroot()
+    for node in root.iter("{geo.vliz.be/MarineRegions}longhurst"):
+        # 1. Get province code, name, bounding box and polygon from file
+        fid = node.get("fid")
+
+        provCode = node.find("{geo.vliz.be/MarineRegions}provcode")
+        assert provCode is not None
+        provCode = provCode.text
+
+        provName = node.find("{geo.vliz.be/MarineRegions}provdescr")
+        assert provName is not None
+        provName = provName.text
+
+        provBB = node.find("{http://www.opengis.net/gml}boundedBy")
+        assert provBB is not None
+        provBB = provBB.find("{http://www.opengis.net/gml}Box")
+        assert provBB is not None
+        provBB = provBB.find("{http://www.opengis.net/gml}coordinates")
+        assert provBB is not None
+        provBB = provBB.text
+        assert provBB is not None
+        bb = _parsePolygonCoordinates(provBB)
+        logger.debug(f"provBB parsed {bb}")
+        bb_Poly = [bb[0], (bb[0][0], bb[1][1]), bb[1], (bb[1][0], bb[0][1]), bb[0]]
+        logger.debug(f"provBB parsed {bb_Poly}")
+        provBB = shapely.Polygon(bb_Poly)
+        logger.debug(f"provBB parsed {provBB}")
+
+        provGeoms = node.find("{geo.vliz.be/MarineRegions}the_geom")
+        assert provGeoms is not None
+        provGeoms = provGeoms.find("{http://www.opengis.net/gml}MultiPolygon")
+        assert provGeoms is not None
+        polygons = []
+        for polygon in provGeoms.iter("{http://www.opengis.net/gml}Polygon"):
+            shell = polygon.find("{http://www.opengis.net/gml}outerBoundaryIs")
+            assert shell is not None
+            shell = list(shell.iter("{http://www.opengis.net/gml}coordinates"))
+            assert len(shell) == 1
+            shell = shell[0].text
+            assert shell is not None
+            shell = _parsePolygonCoordinates(shell)
+            logger.debug(f"shell parsed {shell}")
+            holes = polygon.find("{http://www.opengis.net/gml}innerBoundaryIs")
+            holes_parsed = []
+            if holes is not None:
+                holes = list(holes.iter("{http://www.opengis.net/gml}coordinates"))
+                if len(holes) > 0:
+                    for hole in holes:
+                        hole = hole.text
+                        assert hole is not None
+                        hole = _parsePolygonCoordinates(hole)
+                        holes_parsed.append(hole)
+                logger.debug(f"holes parsed {holes_parsed}")
+            polygons.append(shapely.Polygon(shell=shell, holes=holes_parsed))
+
+        logger.info(f"Parsed province {provName} ({provCode})")
+        provinces[fid] = {
+            "provName": provName,
+            "provCode": provCode,
+            "provBB": provBB,
+            "provGeoms": polygons,
+        }
+
+    return provinces
+
+
+def _parsePolygonCoordinates(coordinates):
+    coordinates = coordinates.split(" ")
+    coordinates = [s.split(",") for s in coordinates]
+    return [(float(x), float(y)) for x, y in coordinates]
+
+
+def _findMatchingBoundingBoxes(
+    lat: float, lon: float, provinces: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Find which candidate provinces our coordinates come from."""
+
+    loc = shapely.Point(lat, lon)
+    matchingProvinces = {}
+    for fid, p in provinces.items():
+        if p["provBB"].contains(loc):
+            matchingProvinces[fid] = p
+
+    return matchingProvinces
+
+
+def _findMatchingProvinceFine(
+    lat: float, lon: float, provinces: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Perform Crossings Test on each candidate province."""
+
+    loc = shapely.Point(lat, lon)
+    matchingProvinces = {}
+    for fid, p in provinces.items():
+        for provGeom in p["provGeoms"]:
+            if provGeom.contains(loc):
+                matchingProvinces[fid] = p
+                break
+
+    return matchingProvinces
+
+
+def _exportFigure(
+    filename: Path | str,
+    latitude: float,
+    longitude: float,
+    provinces: dict[str, dict[str, Any]],
+):
+    logger.info("plotting...")
+    fig = plt.gcf()
+    fig.set_size_inches(28.5, 20.5)
+    plt.ylim(-75, 75)
+    plt.xlim(-200, 200)
+    for p in provinces.values():
+        polygons = p["provGeoms"]
+        clr = (random.random(), random.random(), random.random())
+        for polygon in polygons:
+            center = shapely.centroid(polygon)
+            shapely.plotting.plot_polygon(
+                polygon, color=clr, linewidth=1.0, add_points=False
+            )
+            plt.text(center.x, center.y, p["provCode"], fontsize=22)
+
+    plt.plot(
+        latitude,
+        longitude,
+        marker="o",
+        markersize=20,
+        markeredgecolor="red",
+        markerfacecolor="green",
+    )
+    plt.savefig(filename, dpi=300)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l",
+        "--longhurst-xml-file",
+        type=str,
+        help="Path to the XML file containing the Longhurst Provinces definition in gml format",
+    )
+    parser.add_argument(
+        "-lon",
+        "--longitude",
+        type=float,
+        help="longitude coordinate of the query location",
+    )
+    parser.add_argument(
+        "-lat",
+        "--latitude",
+        type=float,
+        help="latitude coordinate of the query location",
+    )
+    parser.add_argument(
+        "-o",
+        "--out-file",
+        type=str,
+        default=None,
+        help="output location of plot",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+    logging.getLogger("matplotlib").setLevel(logging.INFO)
+
+    _ = find_region(
+        args.latitude, args.longitude, args.longhurst_xml_file, plot_file=args.out_file
+    )
+
+
+if __name__ == "__main__":
+    main()
