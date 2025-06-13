@@ -94,11 +94,11 @@ def _find_region_list(
             region = list(matched_regions.values())[0]
             logger.info("Found region: %f N, %f E -->  %s", lat, lon, region)
 
-        elif len(regions) > 1:
-            # raise RuntimeError(
-            #     f"found multiple regions for lat {latitude}, lon {longitude}? ({regions})"
-            # )
-            pass
+        elif len(matched_regions) > 1:
+            raise RuntimeError(
+                f"found multiple regions for lat {lat}, lon {lon}? ({[p['provCode'] for p in matched_regions.values()]})"
+            )
+            # pass
         regions.append(region)
 
     return regions
@@ -115,9 +115,8 @@ def _find_region_tree(
 
     loc_ids, region_ids = _findMatchingProvinceTree(latitude, longitude, provinces_tree)
 
-    loc_region_id_map = [[]] * len(latitude)
+    loc_region_id_map = [[] for i in range(len(latitude))]
     for loc_id, r_id in zip(loc_ids, region_ids):
-        print(len(loc_region_id_map), loc_id, r_id)
         loc_region_id_map[loc_id].append(r_id)
 
     regions = []
@@ -146,9 +145,13 @@ def _find_region_tree(
             )
 
         elif len(r) > 1:
-            # raise RuntimeError(
-            #     f"found multiple regions for lat {latitude}, lon {longitude}? ({regions})"
-            # )
+            for idx in r:
+                polygon_fid = polygons_fids[idx]
+                region = provinces[polygon_fid]
+                regions.append(region)
+            raise RuntimeError(
+                f"found multiple regions for lat {latitude[idx]}, lon {longitude[idx]}? ({r}, {[p['provCode'] for p in regions]})"
+            )
             pass
         regions.append(region)
 
@@ -221,15 +224,13 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
             logger.debug("shell parsed %s", shell)
             holes = polygon.findall("{http://www.opengis.net/gml}innerBoundaryIs")
             holes_parsed = []
-            if holes is not None:
-                holes = list(holes.iter("{http://www.opengis.net/gml}coordinates"))
-                if len(holes) > 0:
-                    for hole in holes:
-                        hole = hole.text
-                        assert hole is not None
-                        hole = _parsePolygonCoordinates(hole)
-                        holes_parsed.append(hole)
-                logger.debug(f"holes parsed {holes_parsed}")
+            for hole in holes:
+                hole = list(hole.iter("{http://www.opengis.net/gml}coordinates"))
+                hole = hole[0].text
+                assert hole is not None
+                hole = _parsePolygonCoordinates(hole)
+                holes_parsed.append(hole)
+
             polygons.append(shapely.Polygon(shell=shell, holes=holes_parsed))
 
         logger.debug("Parsed province %s (%s)", provName, provCode)
