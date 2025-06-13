@@ -27,6 +27,9 @@ email = "peter.hirsch@mdc-berlin.de"
 [project.urls]
 homepage = "https://github.com/Kainmueller-Lab/Longhurst-Province-Finder"
 
+[project.optional-dependencies]
+ci = ["pytest>=8.3.5"]
+
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
@@ -49,3 +52,9 @@ sources = ["src"]
 [tool.ruff.format]
 docstring-code-format = true
 docstring-code-line-length = 20
+
+[dependency-groups]
+dev = ["pytest>=8.3.5"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
