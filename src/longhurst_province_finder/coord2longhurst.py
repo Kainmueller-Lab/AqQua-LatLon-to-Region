@@ -83,16 +83,16 @@ def _find_region_list(
 
         region = None
         if len(matched_regions) == 0:
-            logger.debug(f"No province found matching {latitude} N, {longitude}E.  ")
+            logger.debug("No province found matching %f N, %f E.  ", lat, lon)
             logger.debug(
                 "This coordinate is either on land or it could be in one of these... "
             )
             for fid, p in provincesBB.items():
-                logger.debug(f"{fid}, {p['provCode']}, {p['provName']}")
+                logger.debug("%s, %s, %s", fid, p["provCode"], p["provName"])
 
         elif len(matched_regions) == 1:
             region = list(matched_regions.values())[0]
-            logger.info(f"Found region: {latitude} N, {longitude} E -->  {region}")
+            logger.info("Found region: %f N, %f E -->  %s", lat, lon, region)
 
         elif len(regions) > 1:
             # raise RuntimeError(
@@ -125,19 +125,24 @@ def _find_region_tree(
         region = None
         if len(r) == 0:
             logger.debug(
-                f"No province found matching {latitude[idx]} N, {longitude[idx]} E.  "
+                "No province found matching %f N, %f E.  ",
+                latitude[idx],
+                longitude[idx],
             )
             logger.debug(
                 "This coordinate is either on land or it could be in one of these:"
             )
             # TODO
             # regions_bb = _findMatchingProvinceTree(latitude, longitude, provinces_bb_tree)
-            # logger.debug(f"found regions (bounding_box) {regions_bb}")
+            # logger.debug(f"found regions (bounding_box) %s", regions_bb)
         elif len(r) == 1:
             polygon_fid = polygons_fids[r[0]]
             region = provinces[polygon_fid]
-            logger.info(
-                f"Found region: {latitude[idx]} N, {longitude[idx]} E -->  {region}"
+            logger.debug(
+                "Found region: %f N, %f E -->  %s",
+                latitude[idx],
+                longitude[idx],
+                region,
             )
 
         elif len(r) > 1:
@@ -194,11 +199,11 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
         provBB = provBB.text
         assert provBB is not None
         bb = _parsePolygonCoordinates(provBB)
-        logger.debug(f"provBB parsed {bb}")
+        logger.debug("provBB parsed %s", bb)
         bb_Poly = [bb[0], (bb[0][0], bb[1][1]), bb[1], (bb[1][0], bb[0][1]), bb[0]]
-        logger.debug(f"provBB parsed {bb_Poly}")
+        logger.debug("provBB parsed %s", bb_Poly)
         provBB = shapely.Polygon(bb_Poly)
-        logger.debug(f"provBB parsed {provBB}")
+        logger.debug("provBB parsed %s", provBB)
 
         provGeoms = node.find("{geo.vliz.be/MarineRegions}the_geom")
         assert provGeoms is not None
@@ -213,8 +218,8 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
             shell = shell[0].text
             assert shell is not None
             shell = _parsePolygonCoordinates(shell)
-            logger.debug(f"shell parsed {shell}")
-            holes = polygon.find("{http://www.opengis.net/gml}innerBoundaryIs")
+            logger.debug("shell parsed %s", shell)
+            holes = polygon.findall("{http://www.opengis.net/gml}innerBoundaryIs")
             holes_parsed = []
             if holes is not None:
                 holes = list(holes.iter("{http://www.opengis.net/gml}coordinates"))
@@ -227,7 +232,7 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
                 logger.debug(f"holes parsed {holes_parsed}")
             polygons.append(shapely.Polygon(shell=shell, holes=holes_parsed))
 
-        logger.debug(f"Parsed province {provName} ({provCode})")
+        logger.debug("Parsed province %s (%s)", provName, provCode)
         provinces[fid] = {
             "provName": provName,
             "provCode": provCode,
