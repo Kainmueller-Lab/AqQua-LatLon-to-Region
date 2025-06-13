@@ -27,16 +27,17 @@ def test_find_region():
 def test_find_region_speed_list():
     longhurst_definition = "../longhurst.xml"
     provinces = parseLonghurstXML(longhurst_definition)
-    lmt = 1000
+    lmt = 10000
     logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
         logging.WARNING
     )
-    start = time.time()
-    for _ in range(lmt):
-        latitude = random.randint(-200000, 200000) / 1000
-        longitude = random.randint(-75000, 75000) / 1000
 
-        _ = find_region(latitude, longitude, provinces)
+    latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
+    longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
+
+    start = time.time()
+    for i in range(lmt):
+        _ = find_region(latitudes[i], longitudes[i], provinces)
 
     end = time.time()
     logger.info(f"time: {end - start}")
@@ -52,9 +53,11 @@ def test_find_region_speed_tree():
     logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
         logging.WARNING
     )
-    start = time.time()
+
     latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
     longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
+
+    start = time.time()
     _ = find_region(
         latitudes,
         longitudes,
@@ -73,19 +76,19 @@ def test_find_region_speed_tree_single():
     longhurst_definition = "../longhurst.xml"
     provinces = parseLonghurstXML(longhurst_definition)
     provinces_tree, polygons_fids = provinces_make_tree(provinces)
-    lmt = 1000
+    lmt = 10000
     logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
         logging.WARNING
     )
+
+    latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
+    longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
+
     start = time.time()
-
-    for _ in range(lmt):
-        latitude = random.randint(-200000, 200000) / 1000
-        longitude = random.randint(-75000, 75000) / 1000
-
+    for i in range(lmt):
         _ = find_region(
-            latitude,
-            longitude,
+            latitudes[i],
+            longitudes[i],
             provinces,
             provinces_tree=provinces_tree,
             polygons_fids=polygons_fids,
