@@ -4,22 +4,31 @@
 
 This package is based on Sara Collins' script (https://github.com/thechisholmlab/Longhurst-Province-Finder ), published under the MIT license.
 
-It mainly provide two functions:
+It mainly provide three functions:
 
 - `find_region` that takes as input latitude and longitude coordinates and a definition of Longhurst Provinces returns the Longhurst Province where the coordinate is located.
 
   - input:
-  - latitude: Northerly latitude ranging from -90 to 90
-  - longitude: Easterly longitude ranging from -180 to 180
-  - `longhurst.xml`: A .gml file that contains the coordinates that bound each province
+    - latitude: Northerly latitude ranging from -90 to 90
+    - longitude: Easterly longitude ranging from -180 to 180
+    - `longhurst.xml`: A .gml file that contains the coordinates that bound each province
+    - use-tree: flag to switch to tree-based matching mode
+    - out-file: plot map of regions and locations
   - output:
-  - `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
+    - `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
 
 - `parseLonghurstXML` that parses a xml/gml Longhurst Provinces definition into a dict
+
   - input:
-  - fl: path to definition file
+    - fl: path to definition file
   - output:
-  - `dict` containing definitions
+    - `dict` containing definitions
+
+- ` provinces_make_tree` that takes a `dict` of Longhurst definitions and creates a `shapely.STRtree` of their polygons
+  - input:
+    - provinces: `dict` containing Longhurst definitions (as returned by `parseLonghurstXML`
+  - output:
+    - `shapely.STRtree` of the provinces polygons
 
 ## Usage
 
@@ -40,9 +49,9 @@ To run it in the command line:
 To use it in your code:
 
 ```
-	import coord2longhurst
+	import longhurst_province_finder
 
 	[...]
 
-	region = coord2longhurst.find_region(lat, lon, <path/to/longhurst.xml>)
+	region = longhurst_province_finder.find_region(lat, lon, <path/to/longhurst.xml>)
 ```
