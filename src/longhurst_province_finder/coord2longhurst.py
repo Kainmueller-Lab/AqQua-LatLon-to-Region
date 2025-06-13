@@ -15,18 +15,20 @@ logger = logging.getLogger(__name__)
 
 
 def find_region(
-    latitude: float,
-    longitude: float,
+    latitude: list[float] | float,
+    longitude: list[float] | float,
     longhurst_definition: str | Path | dict[str, dict[str, Any]],
-    plot_file=None,
-) -> dict[str, Any] | None:
+    provinces_tree: shapely.STRtree | bool = False,
+    polygons_fids: list[str] | None = None,
+    plot_file: str | Path | None = None,
+) -> list[dict[str, Any] | None] | dict[str, Any] | None:
     """Function to match query lat/lon coordinates to their Longhurst Province.
 
     Parameters
     ----------
-    latitude : float
+    latitude : list of float or float
         Northerly latitude ranging from -90 to 90
-    longitude : float
+    longitude : list of float or float
         Easterly longitude ranging from -180 to 180
     longhurst_definition: str or dict
         Definition of the provinces, either path to the xml file or already parsed definition within a dictionary
@@ -35,7 +37,7 @@ def find_region(
 
     Returns
     -------
-    region : dict or None
+    region : list of dict or dict or None
         `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
 
     Raises
@@ -45,31 +47,107 @@ def find_region(
     """
     if isinstance(longhurst_definition, (str, Path)):
         provinces = parseLonghurstXML(Path(longhurst_definition))
+
     else:
         provinces = longhurst_definition
-    provincesBB = _findMatchingBoundingBoxes(latitude, longitude, provinces)
-    provincesFine = _findMatchingProvinceFine(latitude, longitude, provincesBB)
+        assert provinces_tree is not None
+
+    if isinstance(latitude, float):
+        latitude = [latitude]
+    if isinstance(longitude, float):
+        longitude = [longitude]
 
     if plot_file is not None:
         _exportFigure(plot_file, latitude, longitude, provinces)
 
-    region = None
-    if len(provincesFine) == 0:
-        logger.debug(f"No province found matching {latitude} N, {longitude}E.  ")
-        logger.debug(
-            "This coordinate is either on land or it could be in one of these... "
+    if provinces_tree:
+        if not isinstance(provinces_tree, shapely.STRtree):
+            provinces_tree, polygons_fids = provinces_make_tree(provinces)
+        assert polygons_fids is not None, (
+            "please provide a list of fids per polygon in addition to a pre-calculated tree"
         )
-        for fid, p in provincesBB.items():
-            print(fid, p["provCode"], p["provName"])
+        return _find_region_tree(
+            latitude, longitude, provinces, provinces_tree, polygons_fids
+        )
+    else:
+        return _find_region_list(latitude, longitude, provinces)
 
-    elif len(provincesFine) == 1:
-        region = list(provincesFine.values())[0]
-        logger.info(f"Found region: {latitude} N, {longitude} E -->  {region}")
 
-    elif len(provincesFine) > 1:
-        raise RuntimeError(f"found multiple regions? ({provincesFine})")
+def _find_region_list(
+    latitude: list[float], longitude: list[float], provinces: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]] | list[None]:
+    regions = []
+    for lat, lon in zip(latitude, longitude):
+        provincesBB = _findMatchingBoundingBoxes(lat, lon, provinces)
+        matched_regions = _findMatchingProvinceFine(lat, lon, provincesBB)
 
-    return region
+        region = None
+        if len(matched_regions) == 0:
+            logger.debug(f"No province found matching {latitude} N, {longitude}E.  ")
+            logger.debug(
+                "This coordinate is either on land or it could be in one of these... "
+            )
+            for fid, p in provincesBB.items():
+                logger.debug(f"{fid}, {p['provCode']}, {p['provName']}")
+
+        elif len(matched_regions) == 1:
+            region = list(matched_regions.values())[0]
+            logger.info(f"Found region: {latitude} N, {longitude} E -->  {region}")
+
+        elif len(regions) > 1:
+            # raise RuntimeError(
+            #     f"found multiple regions for lat {latitude}, lon {longitude}? ({regions})"
+            # )
+            pass
+        regions.append(region)
+
+    return regions
+
+
+def _find_region_tree(
+    latitude: list[float],
+    longitude: list[float],
+    provinces: dict[str, dict[str, Any]],
+    provinces_tree: shapely.STRtree,
+    polygons_fids: list[str],
+) -> list[dict[str, Any] | None]:
+    assert len(latitude) == len(longitude)
+
+    loc_ids, region_ids = _findMatchingProvinceTree(latitude, longitude, provinces_tree)
+
+    loc_region_id_map = [[]] * len(latitude)
+    for loc_id, r_id in zip(loc_ids, region_ids):
+        print(len(loc_region_id_map), loc_id, r_id)
+        loc_region_id_map[loc_id].append(r_id)
+
+    regions = []
+    for idx, r in enumerate(loc_region_id_map):
+        region = None
+        if len(r) == 0:
+            logger.debug(
+                f"No province found matching {latitude[idx]} N, {longitude[idx]} E.  "
+            )
+            logger.debug(
+                "This coordinate is either on land or it could be in one of these:"
+            )
+            # TODO
+            # regions_bb = _findMatchingProvinceTree(latitude, longitude, provinces_bb_tree)
+            # logger.debug(f"found regions (bounding_box) {regions_bb}")
+        elif len(r) == 1:
+            polygon_fid = polygons_fids[r[0]]
+            region = provinces[polygon_fid]
+            logger.info(
+                f"Found region: {latitude[idx]} N, {longitude[idx]} E -->  {region}"
+            )
+
+        elif len(r) > 1:
+            # raise RuntimeError(
+            #     f"found multiple regions for lat {latitude}, lon {longitude}? ({regions})"
+            # )
+            pass
+        regions.append(region)
+
+    return regions
 
 
 def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
@@ -149,7 +227,7 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
                 logger.debug(f"holes parsed {holes_parsed}")
             polygons.append(shapely.Polygon(shell=shell, holes=holes_parsed))
 
-        logger.info(f"Parsed province {provName} ({provCode})")
+        logger.debug(f"Parsed province {provName} ({provCode})")
         provinces[fid] = {
             "provName": provName,
             "provCode": provCode,
@@ -158,6 +236,20 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
         }
 
     return provinces
+
+
+def provinces_make_tree(provinces):
+    polygons = []
+    polygons_bb = []
+    polygons_fids = []
+    for fid, prov in provinces.items():
+        polygons.extend(prov["provGeoms"])
+        # polygons_bb.append(prov["provBB"])
+        polygons_fids.extend([fid] * len(prov["provGeoms"]))
+
+    provinces_tree = shapely.STRtree(polygons)
+    # provinces_bb_tree = shapely.STRtree(polygons_bb)
+    return provinces_tree, polygons_fids
 
 
 def _parsePolygonCoordinates(coordinates):
@@ -196,10 +288,19 @@ def _findMatchingProvinceFine(
     return matchingProvinces
 
 
+def _findMatchingProvinceTree(
+    latitude: list[float], longitude: list[float], provincesTree: shapely.STRtree
+) -> list[list[int]]:
+    """Perform Crossings Test on each candidate province."""
+
+    loc = [shapely.Point(lat, lon) for lat, lon in zip(latitude, longitude)]
+    return provincesTree.query(loc, predicate="covered_by").tolist()
+
+
 def _exportFigure(
     filename: Path | str,
-    latitude: float,
-    longitude: float,
+    latitude: list[float],
+    longitude: list[float],
     provinces: dict[str, dict[str, Any]],
 ):
     logger.info("plotting...")
@@ -217,14 +318,15 @@ def _exportFigure(
             )
             plt.text(center.x, center.y, p["provCode"], fontsize=22)
 
-    plt.plot(
-        latitude,
-        longitude,
-        marker="o",
-        markersize=20,
-        markeredgecolor="red",
-        markerfacecolor="green",
-    )
+    for lat, lon in zip(latitude, longitude):
+        plt.plot(
+            lat,
+            lon,
+            marker="o",
+            markersize=20,
+            markeredgecolor="red",
+            markerfacecolor="green",
+        )
     plt.savefig(filename, dpi=300)
 
 
@@ -255,13 +357,18 @@ def main():
         default=None,
         help="output location of plot",
     )
+    parser.add_argument("-t", "--use-tree", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
 
     _ = find_region(
-        args.latitude, args.longitude, args.longhurst_xml_file, plot_file=args.out_file
+        args.latitude,
+        args.longitude,
+        args.longhurst_xml_file,
+        plot_file=args.out_file,
+        provinces_tree=args.use_tree,
     )
 
 
