@@ -55,3 +55,29 @@ To use it in your code:
 
 	region = longhurst_province_finder.find_region(lat, lon, <path/to/longhurst.xml>)
 ```
+
+## List of Provinces
+
+### List of Provinces in xml file:
+
+```
+['
+	ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS', 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
+]
+	+ ['CHIL']
+```
+
+### List of Provinces in [doi.org/10.1002/gbc.20089](Dynamic biogeochemical provinces in the global ocean)
+
+```
+['
+	ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS', 'BPLR', 'BRAZ','CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
+]
+	+ ['C(O)CAL', 'HUMB', 'NPSE']
+```
+
+### Notes
+
+- `HUMB` seems to be the same as `CHIL` (west coast South America)
+- `NPSE` (Northeast Pacific subtropical) is not contained in xml file (but I also could not figure out exactly where it is, somewhere South of Japan maybe)
+- `C(O)CAL` (California current) is not contained in xml file (non-coastal California)
