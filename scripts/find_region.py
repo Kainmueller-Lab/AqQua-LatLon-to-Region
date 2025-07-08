@@ -29,18 +29,16 @@ def main():
         default=None,
         help="output location of plot",
     )
-    parser.add_argument("-t", "--use-tree", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     logging.getLogger("matplotlib").setLevel(logging.INFO)
 
-    _ = find_region(
+    func = find_region()
+    _ = func(
         args.latitude,
         args.longitude,
-        longhurst_definition=None,
         plot_file=args.out_file,
-        provinces_tree=args.use_tree,
     )
 
 

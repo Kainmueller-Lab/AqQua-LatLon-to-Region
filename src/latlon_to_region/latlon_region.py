@@ -50,6 +50,7 @@ import importlib.resources
 import logging
 import random
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -60,108 +61,83 @@ logger = logging.getLogger(__name__)
 
 
 def find_region(
-    latitude: list[float] | float,
-    longitude: list[float] | float,
-    longhurst_definition: dict[str, dict[str, Any]] | None = None,
-    provinces_tree: shapely.STRtree | bool = False,
-    polygons_fids: list[str] | None = None,
-    plot_file: str | Path | None = None,
-) -> list[dict[str, Any] | None] | dict[str, Any] | None:
+    provinces: dict[str, dict[str, Any]] | None = None,
+) -> Callable[
+    [list[float] | float, list[float] | float, str | Path | None],
+    list[dict[str, Any] | None] | dict[str, Any] | None,
+]:
     """Function to match query lat/lon coordinates to their Longhurst Province.
 
     Parameters
     ----------
-    latitude : list of float or float
-        Northerly latitude ranging from -90 to 90
-    longitude : list of float or float
-        Easterly longitude ranging from -180 to 180
-    longhurst_definition: dict or None
+    provinces: dict or None
         Definition of the provinces, either already parsed definition in a
-        dictionary or None (causing definition to get parsed from file)
-    provinces_tree: shapely.STRtree or bool
-        Precomputed tree of provinces (faster access) or flag to compute it on the fly
-    plot_file: str or None
-        If provided, a map of the provinces and the query coordinates will be plotted
-        and written to this file.
+        dictionary or None (causing definition to get created internally)
 
     Returns
     -------
-    region : list of dict or dict or None
-        `dict` with Longhurst province code, name, bounding box and polygon,
-        where the coordinate can be found. If the coordinate is on land, or
-        otherwise not associated with a province, `None` will be returned.
+    find_region_func : Callable
+        Function that takes location(s) in the form of latitude/longitude and
+        returns the matching regions
 
     Raises
     ------
     RuntimeError
         If multiple regions are found (bug in definition?)
     """
-    if longhurst_definition is None:
+    if provinces is None:
         provinces = parseLonghurstXML()
 
-    else:
-        provinces = longhurst_definition
-        assert provinces_tree is not None
+    provinces_tree, polygons_fids = provinces_make_tree(provinces)
 
-    list_passed = True
-    if isinstance(latitude, float):
-        list_passed = False
-        latitude = [latitude]
-        assert isinstance(longitude, float)
-    if isinstance(longitude, float):
-        assert not list_passed
-        longitude = [longitude]
+    def find_region_func(
+        latitude: list[float] | float,
+        longitude: list[float] | float,
+        plot_file: str | Path | None = None,
+    ) -> list[dict[str, Any] | None] | dict[str, Any] | None:
+        """Function that takes location(s) in the form of latitude/longitude and
+        returns the matching regions
 
-    if plot_file is not None:
-        _exportFigure(plot_file, latitude, longitude, provinces)
+        Parameters
+        ----------
+        latitude : list of float or float
+            Northerly latitude ranging from -90 to 90
+        longitude : list of float or float
+            Easterly longitude ranging from -180 to 180
+        plot_file: str or None
+            If provided, a map of the provinces and the query coordinates will be
+            plotted and written to this file.
 
-    if provinces_tree:
-        if not isinstance(provinces_tree, shapely.STRtree):
-            provinces_tree, polygons_fids = provinces_make_tree(provinces)
-        assert polygons_fids is not None, (
-            "please provide a list of fids per polygon in addition to a pre-calculated tree"
-        )
+        Returns
+        -------
+        regions : list of dict or dict or None
+            `dict` with province code (e.g., Longhurst), name, bounding box and
+            polygon, where the coordinate can be found. If the coordinate is on
+            land, or otherwise not associated with a province, `None` will be
+            returned.
+        """
+        list_passed = True
+        if isinstance(latitude, float):
+            list_passed = False
+            latitude = [latitude]
+            assert isinstance(longitude, float)
+        if isinstance(longitude, float):
+            assert not list_passed
+            longitude = [longitude]
+
+        if plot_file is not None:
+            _exportFigure(plot_file, latitude, longitude, provinces)
+
         regions = _find_region_tree(
             latitude, longitude, provinces, provinces_tree, polygons_fids
         )
-    else:
-        regions = _find_region_list(latitude, longitude, provinces)
 
-    if len(latitude) == 1 and not list_passed:
-        regions = regions[0]
+        if len(latitude) == 1 and not list_passed:
+            regions = regions[0]
 
-    return regions
+        return regions
 
-
-def _find_region_list(
-    latitude: list[float], longitude: list[float], provinces: dict[str, dict[str, Any]]
-) -> list[dict[str, Any]] | list[None]:
-    regions = []
-    for lat, lon in zip(latitude, longitude):
-        provincesBB = _findMatchingBoundingBoxes(lat, lon, provinces)
-        matched_regions = _findMatchingProvinceFine(lat, lon, provincesBB)
-
-        region = None
-        if len(matched_regions) == 0:
-            logger.debug("No province found matching %f N, %f E.  ", lat, lon)
-            logger.debug(
-                "This coordinate is either on land or it could be in one of these... "
-            )
-            for fid, p in provincesBB.items():
-                logger.debug("%s, %s, %s", fid, p["provCode"], p["provName"])
-
-        elif len(matched_regions) == 1:
-            region = list(matched_regions.values())[0]
-            logger.debug("Found region: %f N, %f E -->  %s", lat, lon, region)
-
-        elif len(matched_regions) > 1:
-            raise RuntimeError(
-                f"found multiple regions for lat {lat}, lon {lon}?"
-                " ({[p['provCode'] for p in matched_regions.values()]})"
-            )
-        regions.append(region)
-
-    return regions
+    return find_region_func
 
 
 def _find_region_tree(
@@ -330,36 +306,6 @@ def _parsePolygonCoordinates(coordinates):
     coordinates = coordinates.split(" ")
     coordinates = [s.split(",") for s in coordinates]
     return [(float(x), float(y)) for x, y in coordinates]
-
-
-def _findMatchingBoundingBoxes(
-    lat: float, lon: float, provinces: dict[str, dict[str, Any]]
-) -> dict[str, dict[str, Any]]:
-    """Find which candidate provinces our coordinates come from."""
-
-    loc = shapely.Point(lat, lon)
-    matchingProvinces = {}
-    for fid, p in provinces.items():
-        if p["provBB"].contains(loc):
-            matchingProvinces[fid] = p
-
-    return matchingProvinces
-
-
-def _findMatchingProvinceFine(
-    lat: float, lon: float, provinces: dict[str, dict[str, Any]]
-) -> dict[str, Any]:
-    """Perform Crossings Test on each candidate province."""
-
-    loc = shapely.Point(lat, lon)
-    matchingProvinces = {}
-    for fid, p in provinces.items():
-        for provGeom in p["provGeoms"]:
-            if provGeom.contains(loc):
-                matchingProvinces[fid] = p
-                break
-
-    return matchingProvinces
 
 
 def _findMatchingProvinceTree(
