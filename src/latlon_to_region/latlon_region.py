@@ -307,7 +307,7 @@ def provinces_make_tree(
 def _parse_polygon_coordinates(coordinates):
     coordinates = coordinates.split(" ")
     coordinates = [s.split(",") for s in coordinates]
-    return [(float(x), float(y)) for x, y in coordinates]
+    return [(float(lon), float(lat)) for lon, lat in coordinates]
 
 
 def _find_matching_province_tree(
@@ -315,7 +315,7 @@ def _find_matching_province_tree(
 ) -> list[list[int]]:
     """Perform Crossings Test on each candidate province."""
 
-    loc = [shapely.Point(lat, lon) for lat, lon in zip(latitude, longitude)]
+    loc = [shapely.Point(lon, lat) for lat, lon in zip(latitude, longitude)]
     return provincesTree.query(loc, predicate="covered_by").tolist()
 
 
@@ -344,8 +344,8 @@ def _export_figure(
 
     for lat, lon in zip(latitude, longitude):
         plt.plot(
-            lat,
             lon,
+            lat,
             marker="o",
             markersize=10,
             markeredgecolor="red",

@@ -17,7 +17,7 @@ def test_find_region_single():
 
     assert region is not None
     assert "provCode" in region
-    assert region["provCode"] == "FKLD"
+    assert region["provCode"] == "APLR"
 
 
 def test_find_region_list():
@@ -29,8 +29,8 @@ def test_find_region_list():
     assert regions is not None
     assert len(regions) == 2
     assert "provCode" in regions[0]
-    assert regions[0]["provCode"] == "FKLD"
-    assert regions[1]["provCode"] == "ARAB"
+    assert regions[0]["provCode"] == "APLR"
+    assert regions[1]["provCode"] == "NECS"
 
 
 def test_find_region_multiple():
