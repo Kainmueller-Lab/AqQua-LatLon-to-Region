@@ -1,13 +1,58 @@
-"""This package provides the function `find_region` that takes as input latitude and longitude coordinates and a definition of Longhurst Provinces returns the Longhurst Province where the coordinate is located. It provides a second function `parseLonghurstXML` to separately parse a Longhurst Provinces definition file."""
+"""This module provides functionality to convert latitude/longitude coordinates
+to their matching Longhurst Province/region.
 
-import argparse
+Functions:
+---------
+find_region: takes as input latitude and longitude coordinates; returns the
+Longhurst Province where the coordinate is located
+    latitude: Northerly latitude ranging from -90 to 90
+    longitude: Easterly longitude ranging from -180 to 180
+    longhurst_definition: if not provided, will be created on-th-fly, preparse
+                          with parseLonghurstXML if querying multiple locations
+    provinces_tree: if not provided, will be created on-th-fly, pre-create alongside
+                    polygons_fids with provinces_make_tree if querying multiple locations
+    polygons_fids: if not provided, will be created on-th-fly, pre-create alongside
+                   provinces_tree with provinces_make_tree if querying multiple locations
+parseLonghurstXML: parses a Longhurst Provinces definition file and returns a dict of provinces
+provinces_make_tree: puts the Longhurst provinces polygons into a STRtree for faster querying
+
+
+List of Provinces
+-----------------
+List of Provinces in xml file:
+['ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS',
+ 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD',
+ 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR',
+ 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD',
+ 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND',
+ 'TASM', 'WARM', 'WTRA']
++ ['CHIL']
+
+List of Provinces in [doi.org/10.1002/gbc.20089](Dynamic biogeochemical provinces in the global ocean)
+['ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS',
+ 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD',
+ 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR',
+ 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD',
+ 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND',
+ 'TASM', 'WARM', 'WTRA'
+]
++ ['C(O)CAL', 'HUMB', 'NPSE']
+
+Notes
+
+- 'HUMB' seems to be the same as 'CHIL' (west coast South America)
+- 'NPSE' (Northeast Pacific subtropical) is not contained in xml file (but I also could
+  not figure out exactly where it is, somewhere South of Japan maybe)
+- 'C(O)CAL' (California current) is not contained in xml file (non-coastal California)
+"""
+
+import importlib.resources
 import logging
 import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
 import shapely
 import shapely.plotting
 
@@ -17,7 +62,7 @@ logger = logging.getLogger(__name__)
 def find_region(
     latitude: list[float] | float,
     longitude: list[float] | float,
-    longhurst_definition: str | Path | dict[str, dict[str, Any]],
+    longhurst_definition: dict[str, dict[str, Any]] | None = None,
     provinces_tree: shapely.STRtree | bool = False,
     polygons_fids: list[str] | None = None,
     plot_file: str | Path | None = None,
@@ -30,31 +75,41 @@ def find_region(
         Northerly latitude ranging from -90 to 90
     longitude : list of float or float
         Easterly longitude ranging from -180 to 180
-    longhurst_definition: str or dict
-        Definition of the provinces, either path to the xml file or already parsed definition within a dictionary
+    longhurst_definition: dict or None
+        Definition of the provinces, either already parsed definition in a
+        dictionary or None (causing definition to get parsed from file)
+    provinces_tree: shapely.STRtree or bool
+        Precomputed tree of provinces (faster access) or flag to compute it on the fly
     plot_file: str or None
-        If provided, a map of the provinces and the query coordinates will be plotted and written to this file.
+        If provided, a map of the provinces and the query coordinates will be plotted
+        and written to this file.
 
     Returns
     -------
     region : list of dict or dict or None
-        `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
+        `dict` with Longhurst province code, name, bounding box and polygon,
+        where the coordinate can be found. If the coordinate is on land, or
+        otherwise not associated with a province, `None` will be returned.
 
     Raises
     ------
     RuntimeError
         If multiple regions are found (bug in definition?)
     """
-    if isinstance(longhurst_definition, (str, Path)):
-        provinces = parseLonghurstXML(Path(longhurst_definition))
+    if longhurst_definition is None:
+        provinces = parseLonghurstXML()
 
     else:
         provinces = longhurst_definition
         assert provinces_tree is not None
 
+    list_passed = True
     if isinstance(latitude, float):
+        list_passed = False
         latitude = [latitude]
+        assert isinstance(longitude, float)
     if isinstance(longitude, float):
+        assert not list_passed
         longitude = [longitude]
 
     if plot_file is not None:
@@ -66,11 +121,16 @@ def find_region(
         assert polygons_fids is not None, (
             "please provide a list of fids per polygon in addition to a pre-calculated tree"
         )
-        return _find_region_tree(
+        regions = _find_region_tree(
             latitude, longitude, provinces, provinces_tree, polygons_fids
         )
     else:
-        return _find_region_list(latitude, longitude, provinces)
+        regions = _find_region_list(latitude, longitude, provinces)
+
+    if len(latitude) == 1 and not list_passed:
+        regions = regions[0]
+
+    return regions
 
 
 def _find_region_list(
@@ -92,13 +152,13 @@ def _find_region_list(
 
         elif len(matched_regions) == 1:
             region = list(matched_regions.values())[0]
-            logger.info("Found region: %f N, %f E -->  %s", lat, lon, region)
+            logger.debug("Found region: %f N, %f E -->  %s", lat, lon, region)
 
         elif len(matched_regions) > 1:
             raise RuntimeError(
-                f"found multiple regions for lat {lat}, lon {lon}? ({[p['provCode'] for p in matched_regions.values()]})"
+                f"found multiple regions for lat {lat}, lon {lon}?"
+                " ({[p['provCode'] for p in matched_regions.values()]})"
             )
-            # pass
         regions.append(region)
 
     return regions
@@ -131,9 +191,6 @@ def _find_region_tree(
             logger.debug(
                 "This coordinate is either on land or it could be in one of these:"
             )
-            # TODO
-            # regions_bb = _findMatchingProvinceTree(latitude, longitude, provinces_bb_tree)
-            # logger.debug(f"found regions (bounding_box) %s", regions_bb)
         elif len(r) == 1:
             polygon_fid = polygons_fids[r[0]]
             region = provinces[polygon_fid]
@@ -150,27 +207,23 @@ def _find_region_tree(
                 region = provinces[polygon_fid]
                 regions.append(region)
             raise RuntimeError(
-                f"found multiple regions for lat {latitude[idx]}, lon {longitude[idx]}? ({r}, {[p['provCode'] for p in regions]})"
+                f"found multiple regions for lat {latitude[idx]}, lon {longitude[idx]}? "
+                "({r}, {[p['provCode'] for p in regions]})"
             )
-            pass
         regions.append(region)
 
     return regions
 
 
-def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
+def parseLonghurstXML() -> dict[str, dict[str, Any]]:
     """
     Parse GML data from longhurst.xml
-
-    Parameters
-    ----------
-    fl : str or Path
-        Path to the definition of the Longhurst Provinces (in xml/gml)
 
     Returns
     -------
     provinces : dict
-        `dict` with the parsed provinces, mapping fid to province information (name, code, bounding box, polygon)
+        `dict` with the parsed provinces, mapping fid to province information
+        (name, code, bounding box, polygon)
 
     Raises
     ------
@@ -178,11 +231,13 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
         If input file is formatted incorrectly.
     """
     provinces = {}
-    tree = ET.parse("longhurst.xml")
+    root = ET.fromstring(
+        importlib.resources.read_text(
+            "latlon_to_region", "longhurst_definition/longhurst.xml"
+        )
+    )
 
-    root = tree.getroot()
     for node in root.iter("{geo.vliz.be/MarineRegions}longhurst"):
-        # 1. Get province code, name, bounding box and polygon from file
         fid = node.get("fid")
 
         provCode = node.find("{geo.vliz.be/MarineRegions}provcode")
@@ -244,17 +299,30 @@ def parseLonghurstXML(fl: str | Path) -> dict[str, dict[str, Any]]:
     return provinces
 
 
-def provinces_make_tree(provinces):
+def provinces_make_tree(
+    provinces: dict[str, dict[str, Any]],
+) -> tuple[shapely.STRtree, list[str]]:
+    """Function to put the Longhurst provinces polygons into a STRtree for faster querying
+
+    Parameters
+    ----------
+    provinces: dict of province id to province data
+        dict that contains the parsed Longhurst Provinces data
+
+    Returns
+    -------
+    provinces_tree: shapely.STRtree
+        tree of polygons that make up the provinces, allows for faster queries
+    polygons_fids:
+        maps polygons back to provinces, to get province data after query
+    """
     polygons = []
-    polygons_bb = []
     polygons_fids = []
     for fid, prov in provinces.items():
         polygons.extend(prov["provGeoms"])
-        # polygons_bb.append(prov["provBB"])
         polygons_fids.extend([fid] * len(prov["provGeoms"]))
 
     provinces_tree = shapely.STRtree(polygons)
-    # provinces_bb_tree = shapely.STRtree(polygons_bb)
     return provinces_tree, polygons_fids
 
 
@@ -309,6 +377,8 @@ def _exportFigure(
     longitude: list[float],
     provinces: dict[str, dict[str, Any]],
 ):
+    import matplotlib.pyplot as plt
+
     logger.info("plotting...")
     fig = plt.gcf()
     fig.set_size_inches(28.5, 20.5)
@@ -334,49 +404,3 @@ def _exportFigure(
             markerfacecolor=(0.0, 1.0, 0.0, 0.5),
         )
     plt.savefig(filename, dpi=300)
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-l",
-        "--longhurst-xml-file",
-        type=str,
-        help="Path to the XML file containing the Longhurst Provinces definition in gml format",
-    )
-    parser.add_argument(
-        "-lon",
-        "--longitude",
-        type=float,
-        help="longitude coordinate of the query location",
-    )
-    parser.add_argument(
-        "-lat",
-        "--latitude",
-        type=float,
-        help="latitude coordinate of the query location",
-    )
-    parser.add_argument(
-        "-o",
-        "--out-file",
-        type=str,
-        default=None,
-        help="output location of plot",
-    )
-    parser.add_argument("-t", "--use-tree", action="store_true")
-    parser.add_argument("-v", "--verbose", action="store_true")
-    args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
-    logging.getLogger("matplotlib").setLevel(logging.INFO)
-
-    _ = find_region(
-        args.latitude,
-        args.longitude,
-        args.longhurst_xml_file,
-        plot_file=args.out_file,
-        provinces_tree=args.use_tree,
-    )
-
-
-if __name__ == "__main__":
-    main()
