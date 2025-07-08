@@ -1,5 +1,5 @@
 [project]
-name = "aqqua-latlon-to-region"
+name = "latlon-to-region"
 dynamic = ["version"]
 license = "MIT"
 license-files = ["LICENSE"]
