@@ -1,12 +1,14 @@
-# Longhurst-Province-Finder
+# AqQua LatLon-to-Region Converter
 
 ## Overview
 
-This package is based on Sara Collins' script (https://github.com/thechisholmlab/Longhurst-Province-Finder ), published under the MIT license.
+This package is based on Sara Collins' script (https://github.com/thechisholmlab/Longhurst-Province-Finder ),
+published under the MIT license.
 
 It mainly provide three functions:
 
-- `find_region` that takes as input latitude and longitude coordinates and a definition of Longhurst Provinces returns the Longhurst Province where the coordinate is located.
+- `find_region` that takes as input latitude and longitude coordinates and a definition of
+  Longhurst Provinces returns the Longhurst Province where the coordinate is located.
 
   - input:
     - latitude: Northerly latitude ranging from -90 to 90
@@ -15,7 +17,9 @@ It mainly provide three functions:
     - use-tree: flag to switch to tree-based matching mode
     - out-file: plot map of regions and locations
   - output:
-    - `dict` with Longhurst province code, name, bounding box and polygon, where the coordinate can be found. If the coordinate is on land, or otherwise not associated with a province, `None` will be returned.
+    - `dict` with Longhurst province code, name, bounding box and polygon, where the
+      coordinate can be found. If the coordinate is on land, or otherwise not associated
+      with a province, `None` will be returned.
 
 - `parseLonghurstXML` that parses a xml/gml Longhurst Provinces definition into a dict
 
@@ -24,7 +28,8 @@ It mainly provide three functions:
   - output:
     - `dict` containing definitions
 
-- ` provinces_make_tree` that takes a `dict` of Longhurst definitions and creates a `shapely.STRtree` of their polygons
+- ` provinces_make_tree` that takes a `dict` of Longhurst definitions and creates a
+  `shapely.STRtree` of their polygons
   - input:
     - provinces: `dict` containing Longhurst definitions (as returned by `parseLonghurstXML`
   - output:
@@ -43,17 +48,17 @@ To install the dependencies:
 To run it in the command line:
 
 ```
-	uv run src/coord2longhurst/coord2longhurst.py -l longhurst.xml -lat -68.999 -lon -54.44  -o plot.png
+	uv run scripts/find_region -lat -68.999 -lon -54.44  -o plot.png
 ```
 
 To use it in your code:
 
 ```
-	import longhurst_province_finder
+	import latlon_to_region
 
 	[...]
 
-	region = longhurst_province_finder.find_region(lat, lon, <path/to/longhurst.xml>)
+	region = latlon_to_region.find_region(lat, lon, <path/to/longhurst.xml>)
 ```
 
 ## List of Provinces
@@ -61,8 +66,13 @@ To use it in your code:
 ### List of Provinces in xml file:
 
 ```
-['
-	ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS', 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
+[
+	'ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG',
+	'BERS', 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR',
+	'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO',
+	'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF',
+	'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT',
+	'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
 ]
 	+ ['CHIL']
 ```
@@ -70,8 +80,13 @@ To use it in your code:
 ### List of Provinces in [doi.org/10.1002/gbc.20089](Dynamic biogeochemical provinces in the global ocean)
 
 ```
-['
-	ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG', 'BERS', 'BPLR', 'BRAZ','CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR', 'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO', 'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF', 'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT', 'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
+[
+	'ALSK', 'ANTA', 'APLR', 'ARAB', 'ARCH', 'ARCT', 'AUSE', 'AUSW', 'BENG',
+	'BERS', 'BPLR', 'BRAZ', 'CAMR', 'CARB', 'CCAL', 'CHIN', 'CNRY', 'EAFR',
+	'ETRA', 'FKLD', 'GFST', 'GUIA', 'GUIN', 'INDE', 'INDW', 'ISSG', 'KURO',
+	'MEDI', 'MONS', 'NADR', 'NASE', 'NASW', 'NATR', 'NECS', 'NEWZ', 'NPPF',
+	'NPSW', 'NPTG', 'NWCS', 'PEQD', 'PNEC', 'PSAE', 'PSAW', 'REDS', 'SANT',
+	'SARC', 'SATL', 'SPSG', 'SSTC', 'SUND', 'TASM', 'WARM', 'WTRA'
 ]
 	+ ['C(O)CAL', 'HUMB', 'NPSE']
 ```
@@ -79,5 +94,6 @@ To use it in your code:
 ### Notes
 
 - `HUMB` seems to be the same as `CHIL` (west coast South America)
-- `NPSE` (Northeast Pacific subtropical) is not contained in xml file (but I also could not figure out exactly where it is, somewhere South of Japan maybe)
+- `NPSE` (Northeast Pacific subtropical) is not contained in xml file (but I also could not
+  figure out exactly where it is, somewhere South of Japan maybe)
 - `C(O)CAL` (California current) is not contained in xml file (non-coastal California)

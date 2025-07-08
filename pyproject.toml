@@ -1,10 +1,11 @@
 [project]
-name = "longhurst-province-finder"
-version = "0.1.0"
-description = "Library to match latitude/longitude coordinates to their Longhurst Province"
+name = "aqqua-latlon-to-region"
+dynamic = ["version"]
+license = "MIT"
+license-files = ["LICENSE"]
+description = "Library to match latitude/longitude coordinates to their region, e.g., Longhurst Province"
 readme = "README.md"
 requires-python = ">=3.12"
-licence = "MIT"
 dependencies = ["matplotlib>=3.10.3", "shapely>=2.1.1"]
 
 classifiers = [
@@ -18,14 +19,11 @@ classifiers = [
 ]
 
 [[project.authors]]
-name = "Sara Collins"
-
-[[project.authors]]
 name = "Peter Hirsch"
 email = "peter.hirsch@mdc-berlin.de"
 
 [project.urls]
-homepage = "https://github.com/Kainmueller-Lab/Longhurst-Province-Finder"
+homepage = "https://github.com/Kainmueller-Lab/AqQua-LatLon-to-Region"
 
 [project.optional-dependencies]
 ci = ["pytest>=8.3.5"]
@@ -48,10 +46,6 @@ sources = ["src"]
 
 [tool.hatch.build.targets.sdist]
 sources = ["src"]
-
-[tool.ruff.format]
-docstring-code-format = true
-docstring-code-line-length = 20
 
 [dependency-groups]
 dev = ["pytest>=8.3.5"]

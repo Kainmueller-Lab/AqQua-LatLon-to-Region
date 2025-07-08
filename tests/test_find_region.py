@@ -2,99 +2,70 @@ import logging
 import random
 import time
 
-import pytest
-
-from longhurst_province_finder import (
+from latlon_to_region import (
     find_region,
-    parseLonghurstXML,
-    provinces_make_tree,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def test_find_region():
+def test_find_region_single():
     latitude = -68.999
     longitude = -54.44
 
-    longhurst_definition = "../longhurst.xml"
-
-    region = find_region(latitude, longitude, longhurst_definition)
+    region = find_region()(latitude, longitude)
 
     assert region is not None
+    assert "provCode" in region
+    assert region["provCode"] == "FKLD"
 
 
-def test_find_region_speed_list():
-    longhurst_definition = "../longhurst.xml"
-    provinces = parseLonghurstXML(longhurst_definition)
+def test_find_region_list():
+    latitudes = [-68.999, 64.234]
+    longitudes = [-54.44, 23.542]
+
+    regions = find_region()(latitudes, longitudes)
+
+    assert regions is not None
+    assert len(regions) == 2
+    assert "provCode" in regions[0]
+    assert regions[0]["provCode"] == "FKLD"
+    assert regions[1]["provCode"] == "ARAB"
+
+
+def test_find_region_multiple():
+    """Tests that only a single region is found per location (lat/lon)"""
+    logging.getLogger("latlon_region").setLevel(logging.WARNING)
     lmt = 10000
-    logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
-        logging.WARNING
-    )
 
     latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
     longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
 
     start = time.time()
-    for i in range(lmt):
-        _ = find_region(latitudes[i], longitudes[i], provinces)
-
-    end = time.time()
-    logger.info(f"time: {end - start}")
-
-    assert True
-
-
-def test_find_region_speed_tree():
-    longhurst_definition = "../longhurst.xml"
-    provinces = parseLonghurstXML(longhurst_definition)
-    provinces_tree, polygons_fids = provinces_make_tree(provinces)
-    lmt = 10000
-    logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
-        logging.WARNING
-    )
-
-    latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
-    longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
-
-    start = time.time()
-    _ = find_region(
+    _ = find_region()(
         latitudes,
         longitudes,
-        provinces,
-        provinces_tree=provinces_tree,
-        polygons_fids=polygons_fids,
     )
 
     end = time.time()
     logger.info(f"time: {end - start}")
 
-    assert True
 
-
-def test_find_region_speed_tree_single():
-    longhurst_definition = "../longhurst.xml"
-    provinces = parseLonghurstXML(longhurst_definition)
-    provinces_tree, polygons_fids = provinces_make_tree(provinces)
+def test_find_region_multiple_indivdually():
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger("latlon_region").setLevel(logging.WARNING)
     lmt = 10000
-    logging.getLogger("longhurst_province_finder.coord2longhurst").setLevel(
-        logging.WARNING
-    )
 
     latitudes = [random.randint(-200000, 200000) / 1000 for _ in range(lmt)]
     longitudes = [random.randint(-75000, 75000) / 1000 for _ in range(lmt)]
 
+    func = find_region()
     start = time.time()
     for i in range(lmt):
-        _ = find_region(
+        _ = func(
             latitudes[i],
             longitudes[i],
-            provinces,
-            provinces_tree=provinces_tree,
-            polygons_fids=polygons_fids,
         )
 
     end = time.time()
     logger.info(f"time: {end - start}")
-
-    assert True
