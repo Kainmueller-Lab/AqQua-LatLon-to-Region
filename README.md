@@ -5,35 +5,22 @@
 This package is based on Sara Collins' script (https://github.com/thechisholmlab/Longhurst-Province-Finder ),
 published under the MIT license.
 
-It mainly provide three functions:
+It mainly provides one function, `find_region`:  
+`find_region` is implemented as a closure.
+The outer function creates the necessary data structures for fast region computation.
+An alternative province definition file can be supplied to the outer function, if none is supplied an internal definition is used.
+The inner function takes as input latitude and longitude coordinates (a single coordinate or a list of coordinates and returns the region (e.g., the Longhurst Province) where each coordinate is located.
 
-- `find_region` that takes as input latitude and longitude coordinates and a definition of
-  Longhurst Provinces returns the Longhurst Province where the coordinate is located.
-
-  - input:
-    - latitude: Northerly latitude ranging from -90 to 90
-    - longitude: Easterly longitude ranging from -180 to 180
-    - `longhurst.xml`: A .gml file that contains the coordinates that bound each province
-    - use-tree: flag to switch to tree-based matching mode
-    - out-file: plot map of regions and locations
-  - output:
-    - `dict` with Longhurst province code, name, bounding box and polygon, where the
-      coordinate can be found. If the coordinate is on land, or otherwise not associated
-      with a province, `None` will be returned.
-
-- `parseLonghurstXML` that parses a xml/gml Longhurst Provinces definition into a dict
-
-  - input:
-    - fl: path to definition file
-  - output:
-    - `dict` containing definitions
-
-- ` provinces_make_tree` that takes a `dict` of Longhurst definitions and creates a
-  `shapely.STRtree` of their polygons
-  - input:
-    - provinces: `dict` containing Longhurst definitions (as returned by `parseLonghurstXML`
-  - output:
-    - `shapely.STRtree` of the provinces polygons
+- input:
+  - latitude: Northerly latitude ranging from -90 to 90
+  - longitude: Easterly longitude ranging from -180 to 180
+  - out-file: plot map of regions and locations, `None` by default, if set a map
+    of provinces and query coordinates is plotted to this file
+- output:
+  - `dict` with Longhurst province code, name, bounding box and polygon, where the
+    coordinate can be found. If the coordinate is on land, or otherwise not associated
+    with a province, `None` will be returned. If multiple coordinates are inquired
+    a list of `dict` is returned.
 
 ## Usage
 
@@ -58,7 +45,8 @@ To use it in your code:
 
 	[...]
 
-	region = latlon_to_region.find_region(lat, lon, <path/to/longhurst.xml>)
+	find_region_func = latlon_to_region.find_region()
+	region = find_region_func(lat, lon)
 ```
 
 ## List of Provinces
