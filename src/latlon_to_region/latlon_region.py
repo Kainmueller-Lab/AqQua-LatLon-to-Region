@@ -86,7 +86,7 @@ def find_region(
         If multiple regions are found (bug in definition?)
     """
     if provinces is None:
-        provinces = parseLonghurstXML()
+        provinces = parse_longhurst_xml()
 
     provinces_tree, polygons_fids = provinces_make_tree(provinces)
 
@@ -126,7 +126,7 @@ def find_region(
             longitude = [longitude]
 
         if plot_file is not None:
-            _exportFigure(plot_file, latitude, longitude, provinces)
+            _export_figure(plot_file, latitude, longitude, provinces)
 
         regions = _find_region_tree(
             latitude, longitude, provinces, provinces_tree, polygons_fids
@@ -149,7 +149,9 @@ def _find_region_tree(
 ) -> list[dict[str, Any] | None]:
     assert len(latitude) == len(longitude)
 
-    loc_ids, region_ids = _findMatchingProvinceTree(latitude, longitude, provinces_tree)
+    loc_ids, region_ids = _find_matching_province_tree(
+        latitude, longitude, provinces_tree
+    )
 
     loc_region_id_map = [[] for i in range(len(latitude))]
     for loc_id, r_id in zip(loc_ids, region_ids):
@@ -191,7 +193,7 @@ def _find_region_tree(
     return regions
 
 
-def parseLonghurstXML() -> dict[str, dict[str, Any]]:
+def parse_longhurst_xml() -> dict[str, dict[str, Any]]:
     """
     Parse GML data from longhurst.xml
 
@@ -232,7 +234,7 @@ def parseLonghurstXML() -> dict[str, dict[str, Any]]:
         assert provBB is not None
         provBB = provBB.text
         assert provBB is not None
-        bb = _parsePolygonCoordinates(provBB)
+        bb = _parse_polygon_coordinates(provBB)
         logger.debug("provBB parsed %s", bb)
         bb_Poly = [bb[0], (bb[0][0], bb[1][1]), bb[1], (bb[1][0], bb[0][1]), bb[0]]
         logger.debug("provBB parsed %s", bb_Poly)
@@ -251,7 +253,7 @@ def parseLonghurstXML() -> dict[str, dict[str, Any]]:
             assert len(shell) == 1
             shell = shell[0].text
             assert shell is not None
-            shell = _parsePolygonCoordinates(shell)
+            shell = _parse_polygon_coordinates(shell)
             logger.debug("shell parsed %s", shell)
             holes = polygon.findall("{http://www.opengis.net/gml}innerBoundaryIs")
             holes_parsed = []
@@ -259,7 +261,7 @@ def parseLonghurstXML() -> dict[str, dict[str, Any]]:
                 hole = list(hole.iter("{http://www.opengis.net/gml}coordinates"))
                 hole = hole[0].text
                 assert hole is not None
-                hole = _parsePolygonCoordinates(hole)
+                hole = _parse_polygon_coordinates(hole)
                 holes_parsed.append(hole)
 
             polygons.append(shapely.Polygon(shell=shell, holes=holes_parsed))
@@ -302,13 +304,13 @@ def provinces_make_tree(
     return provinces_tree, polygons_fids
 
 
-def _parsePolygonCoordinates(coordinates):
+def _parse_polygon_coordinates(coordinates):
     coordinates = coordinates.split(" ")
     coordinates = [s.split(",") for s in coordinates]
     return [(float(x), float(y)) for x, y in coordinates]
 
 
-def _findMatchingProvinceTree(
+def _find_matching_province_tree(
     latitude: list[float], longitude: list[float], provincesTree: shapely.STRtree
 ) -> list[list[int]]:
     """Perform Crossings Test on each candidate province."""
@@ -317,7 +319,7 @@ def _findMatchingProvinceTree(
     return provincesTree.query(loc, predicate="covered_by").tolist()
 
 
-def _exportFigure(
+def _export_figure(
     filename: Path | str,
     latitude: list[float],
     longitude: list[float],
