@@ -150,7 +150,6 @@ wheels = [
 name = "latlon-to-region"
 source = { editable = "." }
 dependencies = [
-    { name = "matplotlib" },
     { name = "shapely" },
 ]
 
@@ -163,10 +162,12 @@ ci = [
 dev = [
     { name = "pytest" },
 ]
+plot = [
+    { name = "matplotlib" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "pytest", marker = "extra == 'ci'", specifier = ">=8.3.5" },
     { name = "shapely", specifier = ">=2.1.1" },
 ]
@@ -174,6 +175,7 @@ provides-extras = ["ci"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.3.5" }]
+plot = [{ name = "matplotlib", specifier = ">=3.10.3" }]
 
 [[package]]
 name = "matplotlib"

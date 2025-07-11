@@ -6,7 +6,9 @@ license-files = ["LICENSE"]
 description = "Library to match latitude/longitude coordinates to their region, e.g., Longhurst Province"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["matplotlib>=3.10.3", "shapely>=2.1.1"]
+dependencies = [
+ "shapely>=2.1.1",
+]
 
 classifiers = [
 	"Programming Language :: Python :: 3",
@@ -49,6 +51,9 @@ sources = ["src"]
 
 [dependency-groups]
 dev = ["pytest>=8.3.5"]
+plot = [
+    "matplotlib>=3.10.3",
+]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

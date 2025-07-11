@@ -4,6 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from latlon_to_region import find_region
+from latlon_to_region.plot_latlon_region import plot_latlon_region
 
 
 def main():
@@ -35,11 +36,10 @@ def main():
     logging.getLogger("matplotlib").setLevel(logging.INFO)
 
     func = find_region()
-    _ = func(
-        args.latitude,
-        args.longitude,
-        plot_file=args.out_file,
-    )
+    _ = func(args.latitude, args.longitude)
+
+    if args.out_file is not None:
+        plot_latlon_region(args.out_file, args.latitude, args.longitude)
 
 
 if __name__ == "__main__":
